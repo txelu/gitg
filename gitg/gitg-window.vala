@@ -22,14 +22,14 @@ namespace Gitg
 
 public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.Buildable
 {
-	private class ActiveView
+	private class ActiveUIElement
 	{
-		public GitgExt.View view;
+		public GitgExt.UIElement element;
 		public Gtk.RadioToolButton? navigation_button;
 
-		public ActiveView(GitgExt.View v)
+		public ActiveUIElement(GitgExt.UIElement e)
 		{
-			view = v;
+			element = e;
 		}
 	}
 
@@ -41,7 +41,7 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 	private HashTable<string, GitgExt.View> d_view_map;
 	private GitgExt.ViewAction d_action;
 
-	private HashTable<string, ActiveView> d_active_views;
+	private HashTable<string, ActiveUIElement> d_active_elements;
 
 	// Widgets
 	private Gtk.Toolbar d_topnav;
@@ -67,23 +67,37 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 		owned get { return d_repository; }
 	}
 
-	private Gtk.RadioToolButton? create_topnav_button(GitgExt.View v)
+	private Gtk.Toolbar toolbar_for_element(GitgExt.UIElement e)
 	{
-		Icon? icon = v.icon;
+		if (e is GitgExt.View)
+		{
+			return d_topnav;
+		}
+		else
+		{
+			return d_subnav;
+		}
+	}
+
+	private Gtk.RadioToolButton? create_nav_button(GitgExt.UIElement e)
+	{
+		Icon? icon = e.icon;
 
 		if (icon == null)
 		{
 			return null;
 		}
 
-		var img = new Gtk.Image.from_gicon(icon, d_topnav.get_icon_size());
+		var bar = toolbar_for_element(e);
+
+		var img = new Gtk.Image.from_gicon(icon, bar.get_icon_size());
 		img.show();
 
 		Gtk.RadioToolButton button;
 
-		if (d_topnav.get_n_items() != 0)
+		if (bar.get_n_items() != 0)
 		{
-			var ic = d_topnav.get_nth_item(0);
+			var ic = bar.get_nth_item(0);
 			button = new Gtk.RadioToolButton.from_widget(ic as Gtk.RadioToolButton);
 		}
 		else
@@ -92,34 +106,57 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 		}
 
 		button.set_icon_widget(img);
-		button.set_label(v.display_name);
+		button.set_label(e.display_name);
 
 		button.show();
 
 		return button;
 	}
 
-	private void add_view(GitgExt.View v)
+	private void add_element(GitgExt.UIElement e)
 	{
 		// Add a navigation button if needed
-		Gtk.RadioToolButton? button = create_topnav_button(v);
-		ActiveView av = new ActiveView(v);
+		Gtk.RadioToolButton? button = create_nav_button(e);
+		ActiveUIElement ae = new ActiveUIElement(e);
 
-		av.navigation_button = button;
+		ae.navigation_button = button;
 
 		if (button != null)
 		{
-			d_topnav.add(button);
+			toolbar_for_element(e).add(button);
 		}
 
 		button.toggled.connect((b) => {
 			if (b.active)
 			{
-				set_view(v);
+				// TODO: make this more scalable
+				GitgExt.View ?v = e as GitgExt.View;
+
+				if (v != null)
+				{
+					set_view(e);
+					return;
+				}
+
+				GitgExt.Panel ?p = e as GitgExt.Panel;
+
+				if (p != null)
+				{
+					set_panel(p);
+				}
 			}
 		});
 
-		d_active_views.insert(v.id, av);
+		d_active_elements.insert(e.id, ae);
+	}
+
+	private void set_panel(GitgExt.Panel p)
+	{
+	}
+
+	private void update_panels()
+	{
+	
 	}
 
 	private void set_view(GitgExt.View v)
@@ -134,6 +171,8 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 		 * 4) Set the current view to @v
 		 * 5) Fill the navigation model with navigation from @v (if needed)
 		 * 6) Query nagivation extensions to fill the navigation model
+		 * 7) Activate available panels and corresponding buttons
+		 * 8) Set current panel
 		 */
 
 		if (d_current_view == v)
@@ -165,13 +204,14 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 		d_notebook_panels.hide();
 		d_subnav.hide();
 
+		// Deactivate the current's view button
 		if (d_current_view != null)
 		{
-			var av = d_active_views.lookup(d_current_view.id);
+			var ae = d_active_elements.lookup(d_current_view.id);
 
-			if (av != null)
+			if (ae != null)
 			{
-				av.navigation_button.set_active(false);
+				ae.navigation_button.set_active(false);
 			}
 		}
 
@@ -211,27 +251,39 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 			d_main_frame.add(widget);
 		}
 
-		var av = d_active_views.lookup(v.id);
+		// Set the current view's navigation button to active
+		var ae = d_active_elements.lookup(v.id);
 
-		if (av.navigation_button != null)
+		if (ae.navigation_button != null)
 		{
-			
-			av.navigation_button.set_active(true);
+			ae.navigation_button.set_active(true);
+		}
+
+		update_panels();
+	}
+
+	private bool remove_ui_element(GitgExt.UIElement e)
+	{
+		ActiveUIElement ae;
+
+		if (d_active_elements.lookup_extended(e.id, null, out ae))
+		{
+			if (ae.navigation_button != null)
+			{
+				ae.navigation_button.destroy();
+			}
+
+			d_active_elements.remove(e.id);
 		}
 	}
 
 	private void remove_view(GitgExt.View v, bool update_current)
 	{
-		ActiveView av;
-
-		if (d_active_views.lookup_extended(v.id, null, out av))
+		if (remove_ui_element(v))
 		{
-			av.navigation_button.destroy();
-
 			d_view_map.remove(v.id);
-			d_active_views.remove(v.id);
 
-			if (av.view == d_current_view)
+			if (v == d_current_view)
 			{
 				d_current_view = null;
 
@@ -241,6 +293,11 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 				}
 			}
 		}
+	}
+
+	private void remove_panel(GitgExt.Panel p)
+	{
+		remove_ui_element(p);
 	}
 
 	private void extension_view_added(Peas.ExtensionSet s,
@@ -253,7 +310,7 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 
 		if (v.is_available())
 		{
-			add_view(v);
+			add_element(v);
 		}
 	}
 
@@ -262,6 +319,25 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 	                                    Object obj)
 	{
 		remove_view(obj as GitgExt.View, true);
+	}
+
+	private void extension_panel_added(Peas.ExtensionSet s,
+	                                   Peas.PluginInfo info,
+	                                   Object obj)
+	{
+		GitgExt.Panel p = obj as GitgExt.Panel;
+
+		if (p.is_available())
+		{
+			add_element(v);
+		}
+	}
+
+	private void extension_panel_removed(Peas.ExtensionSet s,
+	                                     Peas.PluginInfo info,
+	                                     Object obj)
+	{
+		remove_panel(obj as GitgExt.Panel);
 	}
 
 	private void update_nav_visibility(Gtk.Toolbar tb)
@@ -317,14 +393,22 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 		                                                "application",
 		                                                this);
 
+		d_extensions_panels = new Peas.ExtensionSet(engine,
+		                                            typeof(GitgExt.Panel),
+		                                            "application",
+		                                            this);
+
 		d_view_map = new HashTable<string, GitgExt.View>(str_hash, str_equal);
-		d_active_views = new HashTable<string, ActiveView>(str_hash, str_equal);
+		d_active_elements = new HashTable<string, ActiveUIElement>(str_hash, str_equal);
 
 		// Add all the extensions
 		d_extensions_view.foreach(extension_view_added);
-
 		d_extensions_view.extension_added.connect(extension_view_added);
 		d_extensions_view.extension_removed.connect(extension_view_removed);
+
+		d_extensions_panel.foreach(extension_panel_added);
+		d_extensions_panel.extension_added.connect(extension_panel_added);
+		d_extensions_panel.extension_removed.connect(extension_panel_removed);
 
 		activate_default_view();
 
@@ -406,7 +490,7 @@ public class Window : Gtk.ApplicationWindow, GitgExt.Application, Initable, Gtk.
 			}
 			else
 			{
-				add_view(v);
+				add_element(v);
 			}
 		});
 

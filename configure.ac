@@ -42,6 +42,8 @@ AM_PROG_VALAC
 AC_PATH_PROG(GLIB_MKENUMS, glib-mkenums)
 AC_PATH_PROG(GLIB_COMPILE_RESOURCES, glib-compile-resources)
 
+AC_PATH_PROG(VALADOC, valadoc)
+
 # Initialize libtool
 LT_PREREQ([2.2])
 LT_INIT(disable-static)
@@ -98,6 +100,19 @@ PKG_CHECK_MODULES(LIBGITG, [
 	gobject-introspection-1.0 >= $INTROSPECTION_REQUIRED
 	libgit2-glib-1.0
 ])
+
+AC_ARG_ENABLE(docs,
+              [AS_HELP_STRING([--enable-docs],
+                              [enable generating documentation [default=no]])],
+              [enable_docs=$enableval])
+
+if test "$enable_docs" = "yes"; then
+	if test "$VALADOC" = ""; then
+		AC_MSG_ERROR([could not find valadoc])
+	fi
+fi
+
+AM_CONDITIONAL(ENABLE_DOCS, test "$enable_docs" = "yes")
 
 AC_ARG_ENABLE(deprecations,
               [AS_HELP_STRING([--enable-deprecations],
@@ -279,6 +294,7 @@ tests/Makefile
 plugins/Makefile
 plugins/dash/Makefile
 plugins/history/Makefile
+plugins/diff/Makefile
 ])
 
 AC_OUTPUT
