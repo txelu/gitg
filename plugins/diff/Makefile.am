@@ -1,3 +1,5 @@
+SUBDIRS = icons
+
 INCLUDES =								\
 	-I$(top_srcdir)							\
 	-I$(srcdir)							\

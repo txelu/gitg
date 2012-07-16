@@ -197,7 +197,9 @@ function update_diff()
 		write_diff(content, j.diff);
 	}
 
-	r.open("GET", "gitg-internal:/diff/?viewid=" + params.viewid);
+	var t = (new Date()).getTime()
+
+	r.open("GET", "gitg-internal:/diff/?t=" + t + "&viewid=" + params.viewid);
 	r.send();
 }
 
@@ -236,7 +238,7 @@ function date_to_string(d)
 	}
 	else if (t < 3600 * 24 * 6)
 	{
-		return Math.Round(t / (3600 * 24)) + " days ago";
+		return Math.round(t / (3600 * 24)) + " days ago";
 	}
 
 	return d.toLocaleString();

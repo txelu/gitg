@@ -17,25 +17,31 @@
  * along with gitg. If not, see <http://www.gnu.org/licenses/>.
  */
 
-namespace GitgExt
+namespace Gitg
 {
 
-public enum NavigationSide
+class AutohideFrame : Gtk.Frame
 {
-	LEFT = 0,
-	TOP = 1
+	public override void add(Gtk.Widget widget)
+	{
+		base.add(widget);
+
+		update_visibility();
+	}
+
+	public override void remove(Gtk.Widget widget)
+	{
+		base.remove(widget);
+
+		update_visibility();
+	}
+
+	private void update_visibility()
+	{
+		visible = get_child() != null;
+	}
 }
 
-public interface Navigation : Object
-{
-	public abstract Application? application { owned get; construct set; }
-
-	public abstract void populate(GitgExt.NavigationTreeModel model);
-	public abstract bool available { get; }
-
-	public abstract NavigationSide navigation_side { get; }
 }
 
-}
-
-// ex:set ts=4 noet:
+// vi:ts=4

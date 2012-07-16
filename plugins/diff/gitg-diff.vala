@@ -22,12 +22,22 @@ namespace GitgDiff
 	// Do this to pull in config.h before glib.h (for gettext...)
 	private const string version = Gitg.Config.VERSION;
 
-	public class Panel : Object, GitgExt.Panel
+	public class Panel : Object, GitgExt.UIElement, GitgExt.Panel
 	{
-		public GitgExt.Application? application { owned get; construct; }
+		public GitgExt.Application? application { owned get; construct set; }
+		private Gtk.ScrolledWindow d_sw;
+		private GitgGtk.DiffView d_diff;
+		private GitgExt.ObjectSelection? d_view;
 
 		construct
 		{
+			d_diff = new GitgGtk.DiffView(null);
+			d_sw = new Gtk.ScrolledWindow(null, null);
+
+			d_sw.show();
+			d_diff.show();
+
+			d_sw.add(d_diff);
 		}
 
 		public string id
@@ -37,8 +47,14 @@ namespace GitgDiff
 
 		public bool is_available()
 		{
-			// The diff is always available
-			return true;
+			var view = application.current_view;
+
+			if (view == null)
+			{
+				return false;
+			}
+
+			return (view is GitgExt.ObjectSelection);
 		}
 
 		public string display_name
@@ -48,44 +64,50 @@ namespace GitgDiff
 
 		public Icon? icon
 		{
-			owned get
-			{
-				var uri = "resource:///org/gnome/gitg/diff/diff-symbolic.svg";
-				return new FileIcon(File.new_for_uri(uri));
-			}
+			owned get { return new ThemedIcon("diff-symbolic"); }
+		}
+
+		private void on_selection_changed(GitgExt.ObjectSelection selection)
+		{
+			selection.foreach_selected((commit) => {
+				var c = commit as Ggit.Commit;
+
+				if (c != null)
+				{
+					d_diff.commit = c;
+					return false;
+				}
+
+				return true;
+			});
 		}
 
 		public Gtk.Widget? widget
 		{
 			owned get
 			{
-				return null;
+				var objsel = (GitgExt.ObjectSelection)application.current_view;
+
+				if (objsel != d_view)
+				{
+					if (d_view != null)
+					{
+						d_view.selection_changed.disconnect(on_selection_changed);
+					}
+
+					d_view = objsel;
+					d_view.selection_changed.connect(on_selection_changed);
+				}
+
+				return d_sw;
 			}
 		}
 
-//		private Gee.HashMap<string, Object>? from_builder(string path, string[] ids)
-//		{
-//			var builder = new Gtk.Builder();
-
-//			try
-//			{
-//				builder.add_from_resource("/org/gnome/gitg/dash/" + path);
-//			}
-//			catch (Error e)
-//			{
-//				warning("Failed to load ui: %s", e.message);
-//				return null;
-//			}
-
-//			Gee.HashMap<string, Object> ret = new Gee.HashMap<string, Object>();
-
-//			foreach (string id in ids)
-//			{
-//				ret[id] = builder.get_object(id);
-//			}
-
-//			return ret;
-//		}
+		public bool is_enabled()
+		{
+			// TODO
+			return true;
+		}
 	}
 }
 

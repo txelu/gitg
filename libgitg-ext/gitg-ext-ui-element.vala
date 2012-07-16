@@ -47,7 +47,7 @@ public interface UIElement : Object
 	 * property and will be automatically set when an instance of the ui element
 	 * object is created.
 	 */
-	public abstract GitgExt.Application? application { owned get; construct; }
+	public abstract GitgExt.Application? application { owned get; construct set; }
 
 	/**
 	 * A unique id for the ui element.
