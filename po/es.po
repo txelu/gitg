@@ -1116,7 +1116,7 @@ msgstr "_Ver"
 
 #: ../gitg/gitg-window.ui.h:1
 msgid "Add signed-off-by"
-msgstr "Aádir firmado por"
+msgstr "Añadir firmado por"
 
 #: ../gitg/gitg-window.ui.h:2
 msgid "Amend"
